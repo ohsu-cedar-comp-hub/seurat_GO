@@ -1,0 +1,9 @@
+assembly:
+  hg19 
+
+FC:
+  1
+  #FDR adjusted p-value cutoff for GO analysis
+adjp:
+  0.01
+
