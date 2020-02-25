@@ -19,12 +19,21 @@ help <- function(){
 
 degFile = snakemake@input[['degFile']]
 
-
 assembly <- snakemake@params[['assembly']]
 
 FC <- snakemake@params[['FC']]
 adjp <- snakemake@params[['adjp']]
 
+Dir <- snakemake@params[['out_dir']]
+
+up_barplot_out <- snakemake@params[['up_barplot_out']]
+down_barplot_out <- snakemake@params[['down_barplot_out']]
+
+up_dag_out <- snakemake@params[['up_dag_out']]
+down_dag_out <- snakemake@params[['down_dag_out']]
+
+up_consol_out <- snakemake@params[['up_consolidated_out']]
+down_consol_out <- snakemake@params[['down_consolidated_out']]
 
 ## Save values of each argument
 if(!is.na(charmatch("--help",args)) || !is.na(charmatch("-h",args))){
@@ -49,6 +58,7 @@ library(ggplot2)
 library(RColorBrewer)
 library(biomaRt)
 library(GenomicFeatures)
+
 ##----------load differentially expressed genes --------#
 print("Loading differential expressed gene table")
 print(degFile)
@@ -70,7 +80,7 @@ if (assembly == "mm10.Ens_96") {
 }
 
 ##-----------------------------------Functions--------------------------------------#
-runGO <- function(geneList,xx=xx,otype,setName,fname){
+runGO <- function(geneList,xx=xx,otype,setName,fname,dag_out){
   setLength       <- sum(as.numeric(levels(geneList))[geneList]) 
   GOData          <- new("topGOdata", ontology=otype, allGenes=geneList, annot = annFUN.gene2GO, gene2GO = geneID2GO)##run topGO
   resultFisher    <- runTest(GOData, algorithm = "classic", statistic = "fisher")## statistical test for topGO
@@ -88,7 +98,7 @@ runGO <- function(geneList,xx=xx,otype,setName,fname){
   printGraph(GOData,## make the tree for the go data
              resultFisher,
              firstSigNodes = 5,
-             fn.prefix = paste(setName, setLength, otype, sep="_"),
+             fn.prefix = dag_out,
              useInfo = "all",
              pdfSW = TRUE
   )    
@@ -97,7 +107,7 @@ runGO <- function(geneList,xx=xx,otype,setName,fname){
 }
 
 ## function to make barplot of -log10 adjusted pvalues colored by enrichment
-drawBarplot <- function(go, ontology, setName, setSize){
+drawBarplot <- function(go, ontology, setName, setSize, fname){
   go <- go[!go$p.adj > 0.01,]
   if(nrow(go)>1){
     go$Term <- make.unique(paste(sapply(strsplit(as.character(substring(go$Term,1,50)), "\\,"), `[`, 1)))
@@ -108,7 +118,7 @@ drawBarplot <- function(go, ontology, setName, setSize){
     go$Term <-factor(paste(go$Term), levels=rev(paste(go$Term))) ## sort table by adjusted p-value
     ptitle <- paste(ontology, setName, sep='_') ## plot title
     ptitle <- gsub("^.*/","",ptitle)
-    pfname <- paste(setName,ontology, setSize,"pdf",sep=".")## name of png file
+    #pfname <- paste(setName,ontology, setSize,"pdf",sep=".")## name of png file
     if(nrow(go) < 20 ){
       toprange <- 1:nrow(go)
     }else{
@@ -116,7 +126,7 @@ drawBarplot <- function(go, ontology, setName, setSize){
     }
     top <- go[toprange,]
     col <- colorRampPalette(c("white","navy"))(16)   
-    pdf(file=paste(Dir, pfname, sep="/"), height=5,width=7)
+    pdf(file=fname, height=5,width=7)
     print({
       p <- ggplot(top, aes(y=log.p.adj, x=Term, fill=enrich)) + ## ggplot barplot function
         geom_bar(stat="identity",colour="black") +
@@ -135,8 +145,8 @@ drawBarplot <- function(go, ontology, setName, setSize){
   }
 }
 
-writeGOTable <- function(geneList,xx=xx,otype,setName, geneSel){
-    fname <- paste(Dir, paste(setName, otype, "GO_consolidated.txt", sep="_"), sep="/")
+writeGOTable <- function(geneList, xx=xx, otype, setName, geneSel, fname){
+    #fname <- paste(Dir, paste(setName, otype, "GO_consolidated.txt", sep="_"), sep="/")
     GOData = new("topGOdata", ontology=otype, allGenes=geneList, annot = annFUN.gene2GO, gene2GO = geneID2GO, nodeSize=5, geneSel=geneSel)
     resultFisher    <- runTest(GOData, algorithm = "classic", statistic = "fisher")
     goresults = GenTable(GOData,classicFisher=resultFisher,topNodes=20)
@@ -167,7 +177,7 @@ up.setsize
 adjplabel <- gsub("^0\\.","",adjp)
 comparison <- gsub("\\.txt$|\\.rda$","",degFile)
 
-Dir <- sub("$", "/GOterms", dirname(comparison))
+#Dir <- sub("$", "/GOterms", dirname(comparison))
 if(!(file.exists(Dir))) {
   dir.create(Dir,FALSE,TRUE)
 }
@@ -177,15 +187,15 @@ print("make GO table for the up genes")
 
 if(up.setsize <2){
 write.table(NA, file=up_file, sep="\t", col.names=TRUE, quote=FALSE, row.names=FALSE)}else{
-go.UP.BP <- runGO(geneList=up.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"upFC",FC, "adjp", adjp, sep="."),fname=up_file)
-writeGOTable(geneList=up.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"upFC",FC, "adjp", adjp, sep="."),geneSel=up)
+go.UP.BP <- runGO(geneList=up.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"upFC",FC, "adjp", adjp, sep="."),fname=up_file, dag_out=up_dag_out)
+writeGOTable(geneList=up.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"upFC",FC, "adjp", adjp, sep="."), geneSel=up, fname=up_consol_out)
 }
 print("make the png for the up genes")
 
 if(up.setsize >2){
 go.UP.BP <- go.UP.BP[is.finite(go.UP.BP$enrich),]
 setName <- paste(substr(comparison,26,nchar(comparison)-4),"barplot","upFC",FC, "adjp", adjp, sep=".")
-drawBarplot(go=go.UP.BP,ontology="BP",setName=setName, setSize=up.setsize)
+drawBarplot(go=go.UP.BP,ontology="BP",setName=setName, setSize=up.setsize, fname=up_barplot_out)
 print("get down genes and make geneList")
 }
 
@@ -201,12 +211,12 @@ dn.setsize
 print("make GO table for down genes")
 if(dn.setsize <2){
 write.table(NA, file=down_file, sep="\t", col.names=TRUE, quote=FALSE, row.names=FALSE)}else{
-go.DN.BP <- runGO(geneList=dn.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"downFC",FC, "adjp", adjp, sep="."),fname=down_file)
-writeGOTable(geneList=dn.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"downFC",FC, "adjp", adjp, sep="."),geneSel=dn)
+go.DN.BP <- runGO(geneList=dn.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"downFC",FC, "adjp", adjp, sep="."),fname=down_file, dag_out=down_dag_out)
+writeGOTable(geneList=dn.geneList,xx=xx,otype="BP",setName=paste(basename(comparison),"downFC",FC, "adjp", adjp, sep="."),geneSel=dn,fname=down_consol_out)
 }
 
 print("make barplot for down genes")
 if(dn.setsize >2){
 go.DN.BP <- go.DN.BP[is.finite(go.DN.BP$enrich),]
 setName <- paste(substr(comparison,26,nchar(comparison)-4),"barplot","downFC",FC, "adjp", adjp, sep=".")
-drawBarplot(go=go.DN.BP,ontology="BP",setName=setName, setSize=dn.setsize )}
+drawBarplot(go=go.DN.BP,ontology="BP",setName=setName, setSize=dn.setsize, fname=down_barplot_out )}

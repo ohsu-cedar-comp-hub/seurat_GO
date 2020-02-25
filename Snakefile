@@ -37,7 +37,7 @@ for contrast in CONTRASTS:
 
 rule all:
     input:
-        expand(["{contrast}.diffexp.downFC.{FC}.adjp.{adjp}_BP_GO.txt", "{contrast}.diffexp.upFC.{FC}.adjp.{adjp}_BP_GO.txt"], contrast=CONTRASTS,FC=config["FC"], adjp=config["adjp"])
+        expand(["results/{contrast}/{contrast}.diffexp.downFC.{FC}.adjp.{adjp}_BP_GO.txt", "results/{contrast}/{contrast}.diffexp.upFC.{FC}.adjp.{adjp}_BP_GO.txt"], contrast=CONTRASTS,FC=config["FC"], adjp=config["adjp"])
 
 
 include: "rules/seurat.smk"
